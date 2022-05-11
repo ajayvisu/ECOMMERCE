@@ -1,12 +1,10 @@
 const router        = require("express").Router();
 const bcrypt        = require("bcrypt");
 const jwt           = require("jsonwebtoken");
-const sgMail        = require('@sendgrid/mail');
-
+const joiSchema     = require("../validation/joi");
 const userSchema    = require("../models/user");
-//const {sendmail}    = require("../middleware/email");
-require('dotenv').config();
-sgMail.setApiKey(process.env.SENDGRID_MAIL_APIKEY);
+const moment        = require("moment");
+const mail          = require("../middleware/mail");
 
 //REGISTER
 router.post("/register", async (req, res, next)=>{
@@ -38,24 +36,38 @@ router.post("/register", async (req, res, next)=>{
             console.log(newUser.passWord);
             let regUserDetails = await newUser.save();
 
-            const subject = req.body.subject;
-            const text = req.body.text;
-            
-
-            const mailData = {
+         
+            let mailData = {
                 from    : 'ajay.platosys@gmail.com',
                 to      : eMail,
-                subject : subject,
-                text    : text,
-                file    : "verificationmail.ejs",
-                details : {eMail:eMail,
-                           link: "http://localhost:6000/api/users/verfy-mail"
+                subject : "verify mail",
+                fileName: 'verifyMail.ejs',
+                details : {
+                    eMail:eMail
                 }
-                
-            };
-            sgMail.send(mailData)
-                  .then (res.status(200).json({status: "success", message: "email send and user registerd sucessfully", data: regUserDetails}))
-                        console.log("email send sucessfully")
+            }
+            let data = mail.mailsending(mailData);
+            console.log("data:", data);
+            return (res.status(200).json({status: "success", message: "email send and user registerd sucessfully", data: regUserDetails}))
+            console.log("email send sucessfully")
+
+
+            // const subject = req.body.subject;
+            // const text = req.body.text;
+        
+            // const mailData = {
+            //     from    : 'ajay.platosys@gmail.com',
+            //     to      : eMail,
+            //     subject : subject,
+            //     text    : text,
+            //     file    : 'verifyMail.ejs',
+            //     details : {
+            //         eMail:user.eMail
+            //     }
+            // };
+            // sgMail.send(mailData)
+            //       .then (res.status(200).json({status: "success", message: "email send and user registerd sucessfully", data: regUserDetails}))
+            //             console.log("email send sucessfully")
         }
     }catch(err){
         console.log(err.message);
@@ -70,10 +82,10 @@ router.get("/get", async (req, res)=>{
 })
 
 //EMAIL VERIFICATION
-router.get("/verify-mail", async (req, res)=>{
+router.get("/verify-mail/:eMail", async (req, res)=>{
     try{
-        const userDetails = await userSchema.findOneAndUpdate({eMail: req.query.eMail}, {verfiedUser:true}, {new:true}).exec();
-        return res.status(200).json({status: "success", message: "email id verfication successfull", data: userDetails});
+        const userDetails = await userSchema.findOneAndUpdate({eMail: req.params.eMail}, {verfiedUser:true}, {new:true}).exec();
+        return res.status(200).json({status: "success", message: "email id verfication successfull", data: userDetails.verfiedUser});
     }catch(err){
         console.log(err.message);
         return res.status(500).json({status: "failure", message: err.message});
@@ -85,6 +97,8 @@ router.post("/login", async (req, res)=>{
     try{
         const userName=req.body.userName;
         const passWord = req.body.passWord;
+        let date = moment().toDate()
+        console.log(date)
 
         let userDetails;
         let details = await userSchema.findOne({'userName': userName}).select('-userName -_id ').exec()
@@ -97,12 +111,28 @@ router.post("/login", async (req, res)=>{
                 if(userDetails){
                     let match = await bcrypt.compare(passWord, userDetails.passWord);
                     console.log("passWord match found")
-                    return res.status(200).json({status: "success", message: "Login successfull", data: details})
+                    await userSchema.findOneAndUpdate({userName: req.body.userName}, {lastedVisited: date,loginStatus: true}, {new:true}).exec()
+                    return res.status(200).json({status: "success", message: "Login successfull"})
+                    console.log(userDetails);
                 }else{}
         }else{}
     }catch(err){
         console.log(err.message);
         return res.status(500).json({status: "failure", message: err.message})
+    }
+})
+
+//LOGOUT                                                                        
+router.post("/logout",async(req,res)=>{
+    try{
+
+        let date = moment().toDate()
+        console.log(date)
+        const userDetails = await userSchema.findOneAndUpdate({uuid: req.query.uuid}, {lastedVisited: date,loginStatus: false}, {new:true}).exec()
+        return res.status(200).json({status: "success", message: "Logout success"}) 
+    }catch(error){
+        console.log(error.message)
+        return res.status(500).json({status: "failure", message: error.message})
     }
 })
 

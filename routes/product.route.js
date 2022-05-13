@@ -1,7 +1,15 @@
 const router            = require("express").Router();
+const multer            = require("multer");
+const xlsx              = require("xlsx");
+const path              = require("path");
+
 const productSchema     = require("../models/product");
+const userSchema        = require("../models/user");
 const authVerfy         = require("./auth.route");
 const adminVerfy        = require("./auth.route");
+const storageMulter     = require("../middleware/multer");
+
+const upload            = multer({storage: storageMulter.storage})
 
 //CREATE PRODUCT
 router.post("/add", async (req, res)=>{
@@ -129,6 +137,64 @@ router.get("/filter", async(req, res)=>{
     }catch(err){
         console.log(err.message);
         res.status(500).json(err);
+    }
+})
+
+//AGGREGATE
+router.get("/user-based-products", async(req,res) =>{
+        try{
+            let details = await userSchema.aggregate([
+                {
+                    $match:{
+                        $and:[
+                            {"uuid": req.query.uuid},
+                        ]
+                    }
+                },
+                {
+                    '$lookup':{
+                        from:'products',
+                        localField: 'uuid',
+                        foreignField: 'userUuid',
+                        as: 'productDetails'
+                        }
+                },
+                {
+                    '$unwind':{
+                        path:'$productDetails',
+                        preserveNullAndEmptyArrays:true
+                        }
+                },
+                {
+                    $project:{
+                        "_id": 0,
+                        "username": 1,
+                        "productDetails.name": 1,
+                        }
+                },
+            ])
+            
+            console.log(details)
+            if(details.length>=1){
+                return res.status(200).json({'status': 'success', message: "user based product details fetched sucessfully", 'result': details});
+            }else{
+                return res.status(404).json({'status': 'failure', message: "product details not found for the user"})
+            }
+        }catch(error){
+            console.log(error.message);
+            return res.status(400).json({"status": 'failure', 'message': error.message})
+        }
+})
+
+//BULKUPLOAD
+router.post("/bulk-upload", upload.single('file'), async (req, res)=>{
+    try {
+        let path = './bulkuploads/' + req.file.filename;
+        console.log(path);
+        return res.status(200).json({status: "success", message: "bulk upload successfull"})
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({status: "failure", message: error.message})
     }
 })
 

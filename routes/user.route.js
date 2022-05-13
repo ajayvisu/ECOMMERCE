@@ -1,9 +1,10 @@
 const router        = require("express").Router();
 const bcrypt        = require("bcrypt");
 const jwt           = require("jsonwebtoken");
-const joiSchema     = require("../validation/joi");
-const userSchema    = require("../models/user");
 const moment        = require("moment");
+
+const userSchema    = require("../models/user");
+const joiSchema     = require("../validation/joi");
 const mail          = require("../middleware/mail");
 
 //REGISTER
@@ -128,7 +129,7 @@ router.post("/logout",async(req,res)=>{
 
         let date = moment().toDate()
         console.log(date)
-        const userDetails = await userSchema.findOneAndUpdate({uuid: req.query.uuid}, {lastedVisited: date,loginStatus: false}, {new:true}).exec()
+        await userSchema.findOneAndUpdate({uuid: req.query.uuid}, {lastedVisited: date,loginStatus: false}, {new:true}).exec()
         return res.status(200).json({status: "success", message: "Logout success"}) 
     }catch(error){
         console.log(error.message)

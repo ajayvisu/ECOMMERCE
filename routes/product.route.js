@@ -191,8 +191,24 @@ router.post("/bulk-upload", upload.single('file'), async (req, res)=>{
     try {
         let path = './bulkuploads/' + req.file.filename;
         console.log(path);
+        let fileDetails     = xlsx.readFile(path);
+        let sheetDetails    = fileDetails.SheetNames;
+        let result          = xlsx.utils.sheet_to_json(fileDetails.Sheets[sheetDetails[0]]);
+        
+        console.log("result:",result);
+
+        for (let data of result) {
+            let resultData = await productSchema.findOne({name:data.name})
+            if(resultData){
+                updateData = await productSchema.findOneAndUpdate({name:data.name}, {new:true})
+                }else{
+                    const newData = new productSchema(data);
+                    const newProductsDetails = await newData.save();
+                    console.log("newProductsDetails:", newProductsDetails);
+                }
+        }
         return res.status(200).json({status: "success", message: "bulk upload successfull"})
-    } catch (error) {
+    }catch (error) {
         console.log(error);
         return res.status(500).json({status: "failure", message: error.message})
     }
